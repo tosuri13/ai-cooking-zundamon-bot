@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Timeout: 300
+    MemorySize: 128
+
+Resources:
+  ACZBApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: aczb-api
+      OpenApiVersion: 3.0.0
+      StageName: v1
+
+  ACZBTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: aczb-topic
+
+  ACZBApiPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src
+      Events:
+        ACZBApiEvents:
+          Type: Api
+          Properties:
+            Path: /
+            Method: POST
+            RestApiId: !Ref ACZBApiGateway
+      FunctionName: aczb-api-post-function
+      Handler: ai_cooking_zundamon_bot.function.api.post.function.handler
+      MemorySize: 512
+      Role: !GetAtt ACZBFunctionRole.Arn
+      Runtime: python3.11
+
+  ACZBWorkerRecipeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+      Events:
+        ACZBSnsEvents:
+          Type: SNS
+          Properties:
+            FilterPolicy:
+              command:
+                - recipe
+            Topic: !Ref ACZBTopic
+      FunctionName: aczb-worker-recipe-function
+      Handler: ai_cooking_zundamon_bot.function.worker.recipe.function.handler
+      Role: !GetAtt ACZBFunctionRole.Arn
+      Runtime: python3.11
+
+  ACZBFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: aczb-function-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - bedrock:InvokeModel
+                  - s3:GetObject
+                  - s3:PutObject
+                  - sns:Publish
+                  - sns:Subscribe
+                  - ssm:GetParameter
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+      RoleName: aczb-function-role
+
+  ACZBWorkerTopicArnParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: "/ACZB/WORKER_TOPIC_ARN"
+      Type: String
+      Value: !Ref ACZBTopic
