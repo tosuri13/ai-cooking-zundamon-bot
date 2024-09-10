@@ -78,9 +78,6 @@ Resources:
                   - sns:Publish
                   - sns:Subscribe
                   - ssm:GetParameter
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
                 Resource: "*"
       RoleName: aczb-function-role
 
